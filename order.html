@@ -1,0 +1,190 @@
+
+<html><head>
+<link  type="text/css" href="https://cdn.datatables.net/1.10.16/css/jquery.dataTables.min.css" rel="stylesheet"/>
+<script src="http://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.3.1.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.12.1/xlsx.full.min.js"></script>
+<script src="https://cdn.datatables.net/1.10.16/js/jquery.dataTables.min.js"></script>
+
+<script>
+
+
+var oFileIn;
+
+$(function() {
+
+    var onChange = function(oEvent){
+
+      var oFile = oEvent.target.files[0];
+      if(oFile == undefined) 
+          return;
+      // var sFilename = oFile.name;
+
+      var fileNum = oEvent.target.files.length;
+      var dealtNum = 0;
+      var chunk = new Array();
+
+      $("#originalDataArea").empty();
+
+      $(oEvent.target.files).each(function(index,file){
+
+           var promise = excelToJSON(index,file);
+           promise.catch(function(err) {
+              console.log(err);
+              alert(err);
+           });
+
+           promise.then(function(value) {
+                console.log('input excel:',value);
+                dealtNum = dealtNum + 1;
+                chunk.push(value);
+                if(dealtNum == fileNum){
+                    makeComparation(chunk);
+                }
+
+           });
+
+      });
+    };
+
+
+    oFileIn = document.getElementById('my_file_input');
+    if(oFileIn.addEventListener) {
+        oFileIn.addEventListener('change', onChange, false);
+    }
+
+
+});
+
+
+var excelToJSON = function(index, oFile) {
+
+    const promise = new Promise((resolve, reject) => {
+
+            var reader = new FileReader();
+
+            reader.onload = function(e) {
+              var data = e.target.result;
+              var workbook = XLSX.read(data, {
+                type: 'binary'
+              });
+
+              workbook.SheetNames.forEach(function(sheetName) {
+                // Here is your object
+                var XL_row_object = XLSX.utils.sheet_to_row_object_array(workbook.Sheets[sheetName]);
+                //var json_object = JSON.stringify(XL_row_object);
+                $("<div style='font-weight:bold'>"+oFile.name+"</div>").appendTo("#originalDataArea");
+                printTable(XL_row_object, "#originalDataArea");
+
+                resolve(XL_row_object);
+
+              });
+
+            };
+
+            reader.onerror = function(ex) {
+              console.log(ex);
+              reject(ex);
+            };
+
+            reader.readAsBinaryString(oFile);
+    });
+
+    return promise;
+
+};
+
+
+
+var makeComparation = function(chunk){
+
+    console.log('finall data chunk:', chunk);
+    var dataset = new Array();
+
+    var hash = (function() {
+          var keys = {};
+          return {
+              contains: function(key) {
+                  return keys[key] === true;
+              },
+              add: function(key) {
+                  if (keys[key] !== true)
+                  {
+                      keys[key] = true;
+                  }
+              }
+          };
+    })();
+
+    var getByName = function(array,name){
+        var r = null;
+        $(array).each(function(index, item){
+            if(item.Name == name)
+              r = item;
+        });
+        return r;
+    };
+
+
+
+    $(chunk).each(function(i,r){
+          $.each(r, function(ii, row){
+                 //$.extend( true, result, d);
+                 if (!hash.contains(row.Name)){
+                    hash.add(row.Name);
+                    dataset.push(row);
+                 }else{
+                    var obj = getByName(dataset, row.Name);
+                    obj.Amount = Number(obj.Amount) + Number(row.Amount);
+                 }
+          });
+    });
+
+    console.log('finall result:', dataset);
+
+    $("#finalResultArea").empty();
+
+    $("<div style='font-weight:bold'>Final Result:</div>").appendTo("#finalResultArea");
+
+    printTable(dataset, "#finalResultArea");
+
+};
+
+var columns = [
+                  { "data" : "ID" },
+                  { "data" : "Name" },   
+                  { "data" : "Amount" }
+              ];
+
+var printTable = function (objectOf, whereTo){
+
+      var oTblReport = $("<table style='width:100%'>").appendTo(whereTo);
+      oTblReport.DataTable ({
+          "data" : objectOf,
+             "destroy": true,
+             "columns": columns
+      });
+}
+
+
+</script>
+
+</head>
+<body>
+
+<input type="file" id="my_file_input" multiple="multiple"/>
+<br/><br/>
+<div id = "originalDataArea"></div>
+<br/><br/>
+
+<div id = "finalResultArea"><div>
+
+</body>
+
+</html>
+
+
+
+
+
+
+
